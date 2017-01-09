@@ -174,7 +174,7 @@ generate
                      <= 0;
                 end
                 else begin
-                    if(filed_flag) begin
+                    if(filed_flag_3) begin
                         zero_reg_3[y>>1][x<<1]  <= c;   
                     end
                 end
@@ -198,7 +198,7 @@ generate
                      <= 0;
                 end
                 else begin
-                    if(filed_flag) begin
+                    if(filed_flag_2) begin
                         zero_reg_2[y>>1][x<<1]  <= c;   
                     end
                 end
@@ -219,7 +219,7 @@ always @(posedge clk or negedge rst_n) begin
          <= 0;
     end
     else begin
-        if(filed_flag) begin
+        if(filed_flag_1) begin
             zero_reg_1  <= c;   
         end
     end

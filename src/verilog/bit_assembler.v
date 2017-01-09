@@ -86,7 +86,7 @@ module bit_assembler
     localparam          TILE_WIDTH              = 32'd128;
     localparam          TILE_HEIGHT             = 32'd128;
     localparam          NO_OF_CMP               = 16'd3;
-    localparam          ENUMES                    = 32'h10;               // 0x11 mono chrome // 0x10 RGB
+    localparam          ENUMES                  = 32'h10;               // 0x11 mono chrome // 0x10 RGB
 
     localparam          LL_E                    = 11'd10;
     localparam          HL_E                    = 11'd10;
@@ -152,7 +152,7 @@ module bit_assembler
     localparam          SOT                     = 16'hFF90;
     localparam          SOT_L                   = 16'h000A;
     localparam          SOT_I_T                 = 16'h0000;
-    localparam          SOT_L_TP                = 32'h00000000;      // for last tile = 0
+    localparam          SOT_L_TP                = 32'h00000000;    // for last tile = 0
     localparam          SOT_I_TP                = 8'h00;
     localparam          SOT_N_TP                = 8'h01;
 
@@ -164,7 +164,7 @@ module bit_assembler
 // Internal wires and registers
 //---------------------------------------------------------------------------------------------------------------------
     reg             [NO_OF_BOX_STATES-1:0]      state_box;
-    reg             [TILE_CNT_W-1:0]			tile_index;
+    reg             [TILE_CNT_W-1:0]            tile_index;
 
     wire             [BIT_32-1:0]                width;
     wire             [BIT_32-1:0]                height;
@@ -310,25 +310,101 @@ always @(posedge clk or negedge rst_n) begin
             end
             STATE_BOX_SOT:  begin
                 if(m_axis_tx_ready_i && length ready) begin                            //    check
-                    state_box                                   <= STATE_BOX_PKT_HDR;
+                    state_box                                   <= STATE_BOX_PKT_HDR_1;
 
                     m_axis_tx_valid_o                           <= 1'b1;
                     m_axis_tx_keep_o                            <= {2'b00,(KEEP_W-2){1'b1}};
-                    m_axis_tx_data_o                            <= {16'hFF93,8'h02,tile_part_index,tile_part_length,tile_index,16'h000a,16'hFF90};    
+                    m_axis_tx_data_o                            <= {16'hFF93,8'h02,tile_part_index,tile_part_length,tile_index,16'h000a,16'hFF90};   
                 end
             end
-            STATE_BOX_PKT_HDR:  begin
-                if(m_axis_tx_ready_i && length ready && s_axis_hdr_rx_valid_i) begin  
-
+            STATE_BOX_PKT_HDR_1: begin
+                if(m_axis_tx_ready_i) begin
+                    if(s_axis_hdr_rx_valid_i) begin
+                        state_box                               <= STATE_BOX_PKT_HDR_2;
+                    end
+                    m_axis_tx_valid_o                           <= 1'b0;
+                end
+                else begin
+                    if(!m_axis_tx_valid_o && s_axis_hdr_rx_valid_i) begin
+                        state_box                               <= STATE_BOX_PKT_HDR_2;
+                    end
+                end
+            end
+            STATE_BOX_PKT_HDR_2: begin
+                if(s_axis_hdr_rx_valid_i && ( m_axis_tx_ready_i || !m_axis_tx_valid_o)) begin
                     if(s_axis_hdr_rx_last_i) begin
-                    	state_box                               <= STATE_BOX_PKT_DATA;
+                        state_box                               <= STATE_BOX_PKT_DATA;
                     end
 
                     m_axis_tx_valid_o                           <= 1'b1;
                     m_axis_tx_keep_o                            <= s_axis_hdr_rx_keep_i;
-                    m_axis_tx_data_o                            <= s_axis_hdr_rx_data_i;    
+                    m_axis_tx_data_o                            <= s_axis_hdr_rx_data_i;
+
+                    s_axis_hdr_rx_ready_o                       <= 1'b1;
                 end
-            end            
+                else begin
+                    m_axis_tx_valid_o                           <= 1'b0;
+
+                    s_axis_hdr_rx_ready_o                       <= 1'b0;
+                end
+            end
+            STATE_BOX_PKT_DATA_1: begin
+                if(m_axis_tx_ready_i) begin
+                    if(s_axis_data_rx_valid_i) begin
+                        state_box                               <= STATE_BOX_PKT_DATA_2;
+                    end
+
+                    m_axis_tx_valid_o                           <= 1'b0;
+
+                    s_axis_hdr_rx_ready_o                       <= 1'b0;                
+                end
+                else if(!m_axis_tx_valid_o && s_axis_data_rx_valid_i) begin
+                    state_box                                   <= STATE_BOX_PKT_DATA_2;
+                end
+            end
+            STATE_BOX_PKT_DATA_2: begin
+                if(s_axis_data_rx_valid_i && ( m_axis_tx_ready_i || !m_axis_tx_valid_o)) begin
+                    if(data_cnt == pkt_data_length) begin
+                        if(tile_part_cnt < 2) begin
+                           state_box                            <= STATE_BOX_SOT;
+                        end
+                        else
+                            state_box                           <= STATE_BOX_EOC;
+                        end
+                        data_cnt                                <= 32'd0;
+                    end
+                    m_axis_tx_valid_o                           <= 1'b1;
+                    m_axis_tx_keep_o                            <= s_axis_data_rx_keep_i;
+                    m_axis_tx_data_o                            <= s_axis_data_rx_data_i;
+
+                    s_axis_data_rx_ready_o                      <= 1'b1;
+                end
+                else begin
+                    m_axis_tx_valid_o                           <= 1'b0;
+
+                    s_axis_data_rx_ready_o                      <= 1'b0;
+                end
+            end
+            STATE_BOX_EOC : begin
+                if(m_axis_tx_ready_i)begin
+                    state_box                                   <= STATE_BOX_LAST;
+
+                    m_axis_tx_valid_o                           <= 1'b1;
+                    m_axis_tx_last_o                            <= 1'b1;
+                    m_axis_tx_keep_o                            <= {{KEEP_W-2}1'b0,{2'b11}};
+                    m_axis_tx_data_o                            <= {{DATA_W-16}1'b0,16'hffd9};
+
+                    s_axis_data_rx_ready_o                      <= 1'b0;
+                end
+            end
+            STATE_BOX_LAST : begin
+                if(m_axis_tx_ready_i) begin
+                    state_box                                   <= STATE_BOX_INIT;
+
+                    m_axis_tx_valid_o                           <= 1'b0;
+                    m_axis_tx_last_o                            <= 1'b0;
+                end
+            end
             default :   begin
             end
         endcase

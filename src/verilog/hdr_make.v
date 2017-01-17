@@ -39,7 +39,9 @@ module hdr_make
 
     parameter               ZERO_DATA_W     =   5,
     parameter               PASS_DATA_W     =   32,
-    parameter               LENGTH_DATA_W   =   32                   
+    parameter               LENGTH_DATA_W   =   32,
+    parameter               BIT_CNT_W       =   6,
+    parameter               HDR_DATA_W      =   32                  
 )
 (
 //---------------------------------------------------------------------------------------------------------------------
@@ -67,9 +69,14 @@ module hdr_make
     input                                       s_axis_zero_rx_valid_i,
     input                                       s_axis_zero_rx_last_i,
     input                   [ZERO_DATA_W-1:0]   s_axis_zero_rx_data_i,
-    output reg                                  s_axis_zero_rx_reday_o
+    output reg                                  s_axis_zero_rx_reday_o,
 
-);
+    output reg                                  valid_o,
+    output reg                                  hdr_last_o,
+    output reg                                  insert_zero_o,
+    output reg              [BIT_CNT_W-1:0]     bit_cnt_o,
+    output reg              [HDR_DATA_W-1:0]    hdr_data_o,
+);  input                                       hdr_ready_i,
 
 //---------------------------------------------------------------------------------------------------------------------
 // Global constant headers
@@ -79,15 +86,17 @@ module hdr_make
 // localparam definitions
 //---------------------------------------------------------------------------------------------------------------------
     localparam          NO_OF_FILL_STATES       = 4;
-    localparam          NO_OF_TAG_STATES        = 4;
+    localparam          NO_OF_HDR_STATES        = 4;
 
     localparam          Y_W                     = 4;
     localparam          X_W                     = 4;
+    localparam          CB_I_W                  = 6;
+    localparam          TMP_W                   = 4;
 //---------------------------------------------------------------------------------------------------------------------
 // Internal wires and registers
 //---------------------------------------------------------------------------------------------------------------------
     reg                 [NO_OF_FILL_STATES-1:0]     state_fill;
-    reg                 []
+    reg                 [NO_OF_HDR_STATES-1:0]      state_hdr;
 
     reg                                             zero_reg_1;
     reg                 [ZERO_DATA_W-1:0]           zero_reg_2            [1:0][1:0];
@@ -97,10 +106,11 @@ module hdr_make
     reg                 [Y_W-1:0]                   y;
     reg                 [X_W-1:0]                   x;
 
+    reg                 [CB_I_W-1:0]                cb_i;
+
     wire                [Y_W-1:0]                   row_cnt;
     wire                [Y_W-1:0]                   colum_cnt;
-
-    wire                
+                                              
 //---------------------------------------------------------------------------------------------------------------------
 // Implementation
 //---------------------------------------------------------------------------------------------------------------------
@@ -116,6 +126,8 @@ always @(posedge clk or negedge rst_n) begin
                 if(s_axis_zero_rx_valid_i) begin
                     state_fill                  <= STATE_FILL_ROW; 
                 end
+
+                filed_flag                      <= 1'b0;
             end
             STATE_FILL_ROW  :   begin
                 if(!s_axis_zero_rx_valid_i) begin
@@ -225,4 +237,104 @@ always @(posedge clk or negedge rst_n) begin
     end
 end
 
+always @(posedge clk or negedge rst_n) begin
+    if(~rst_n) begin
+        filed_flag_0                            <= 1'b0;
+        filed_flag_1                            <= 1'b0;
+        filed_flag_2                            <= 1'b0;
+        filed_flag_3                            <= 1'b0;
+    end 
+    else begin
+        if(filed_flag) begin
+            filed_flag_3                        <= 1'b1;
+        end
+        else if(filed_flag_3) begin
+            filed_flag_2                        <= 1'b1;
+            filed_flag_3                        <= 1'b0;
+        end
+        else if(filed_flag_2) begin
+            filed_flag_1                        <= 1'b1;
+            filed_flag_2                        <= 1'b0;
+        end
+        if(filed_flag_1) begin
+            filed_flag_0                        <= 1'b1;
+            filed_flag_1                        <= 1'b0;
+        end
+        if(filed_flag_0) begin
+            filed_flag_0                        <= 1'b0;
+        end
+        else begin
+            filed_flag_0                        <= 1'b0;
+            filed_flag_1                        <= 1'b0;
+            filed_flag_2                        <= 1'b0;
+            filed_flag_3                        <= 1'b0;    
+        end
+    end
+end
+always @(posedge clk or negedge rst_n) begin
+    if(~rst_n) begin
+         <= 0;
+    end
+    else begin
+        case (state_hdr) begin
+            STATE_HDR_INIT :    begin
+                if(filed_flag_0) begin
+                    state_hdr                   <= STATE_HDR_PKT_INDEX;
+
+                    hdr_data_o                  <= 32'hff910004;
+                    valid_o                     <= 1'b1;
+                    bit_cnt_o                   <= 6'd32;     
+                end
+
+                cb_i                            <= CB_I_W{1'b0};
+            end
+            STATE_HDR_PKT_INDEX : begin
+                if(hdr_ready_i) begin
+                    state_hdr                   <= STATE_HDR_CHECK_ZERO;
+
+                    hdr_data_o                  <= pkt_index;
+                    valid_o                     <= 1'b1;
+                    bit_cnt_o                   <= 6'd16; 
+                end
+            end
+            STATE_HDR_CHECK_ZERO : begin
+                if(s_axis_pass_rx_valid_i && (hdr_ready_i || !valid_o)) begin
+                    if(s_axis_pass_rx_data_i == 0) begin
+                        state_hdr               <= STATE_HDR_LAST;
+
+                        hdr_data_o              <= {8'h00,1'b1,15'd0,16'hff92};
+                        valid_o                 <= 1'b1;
+                        bit_cnt_o               <= 6'd16;
+                        hdr_last_o              <= 1'b1;
+                    end
+                    else begin
+                        state_hdr               <= STATE_HDR_CODE_BLOCK;
+
+                        hdr_data_o              <= {8'h00,1'b1,15'd0,16'hff92};
+                        valid_o                 <= 1'b1;
+                        bit_cnt_o               <= 6'd32;
+                    end
+                end
+                else if(!s_axis_pass_rx_valid_i)begin
+                    valid_o                     <= 1'b0;
+                end
+            end
+            STATE_HDR_CODE_BLOCK : begin
+                if(hdr_ready_i) begin
+                    if(cb_i == 0) begin
+                        state_hdr               <= STATE_HDR_ZERO_4;
+
+                        hdr_data_o              <= {28'd0,4'b1111};
+                        valid_o                 <= 1'b1;
+                        bit_cnt_o               <= 6'd4;
+                    end
+                    else begin
+                     
+                    end
+                end
+            end
+            default : ;
+        endcase   
+    end
+end
 endmodule

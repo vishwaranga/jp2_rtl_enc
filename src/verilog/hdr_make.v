@@ -94,7 +94,7 @@ module hdr_make
     localparam          CB_I_W                  = 6;
     localparam          TMP_W                   = 4;
     localparam          BITS_W                  = 6;
-    localparam          PKT_CNT_W               = 2;
+    localparam          PKT_INDEX_W             = 2;
     localparam          SB_CNT_W                = 2;
 //---------------------------------------------------------------------------------------------------------------------
 // Internal wires and registers
@@ -116,7 +116,7 @@ module hdr_make
     wire                [Y_W-1:0]                   x_limit;
 
     reg                 [BITS_W:0]                  lblock;
-    reg                 [PKT_CNT_W-1:0]             pkt_cnt;
+    reg                 [PKT_INDEX_W-1:0]           pkt_index;
     reg                 [SB_CNT_W-1:0]              sb_cnt;
                                               
 //---------------------------------------------------------------------------------------------------------------------
@@ -131,7 +131,7 @@ always @(posedge clk or negedge rst_n) begin
     end else begin
         case(state_fill)  : begin
             STATE_FILL_INIT  :   begin
-                if(s_axis_zero_rx_valid_i) begin
+                if(s_axis_zero_rx_valid_i && (!hdr_maker_busy)) begin
                     state_fill                  <= STATE_FILL_ROW; 
                 end
 
@@ -285,16 +285,33 @@ always @(posedge clk or negedge rst_n) begin
     end
     else begin
         case (state_hdr) begin
-            STATE_HDR_INIT :    begin
+            STATE_HDR_INIT_TILE : begin
+                state_hdr                       <= STATE_HDR_INIT_PKT;
+
+                pkt_index                       <= PKT_INDEX_W{1'b0};
+
+                valid_o                         <= 1'b0;
+                insert_zero_o                   <= 1'b0;
+                insert_ones_o                   <= 1'b0;
+                hdr_maker_busy                  <= 1'b0;
+            end
+            STATE_HDR_INIT_PKT :    begin
                 if(filed_flag_0) begin
                     state_hdr                   <= STATE_HDR_PKT_INDEX;
 
                     hdr_data_o                  <= 32'hff910004;
                     valid_o                     <= 1'b1;
-                    bit_cnt_o                   <= 6'd32;     
-                end
+                    bit_cnt_o                   <= 6'd32;
 
-                pkt_cnt                         <= PKT_CNT_W
+                    hdr_maker_busy              <= 1'b1;
+
+                    sb_cnt                      <= SB_CNT_W{1'b0};
+                    cb_y                        <= Y_W{1'b0};
+                    cb_x                        <= X_W{1'b0};     
+                end
+                else begin
+                    hdr_maker_busy              <= 1'b0;
+                end
             end
             STATE_HDR_PKT_INDEX : begin
                 if(hdr_ready_i) begin
@@ -473,11 +490,14 @@ always @(posedge clk or negedge rst_n) begin
             STATE_HDR_LENGTH : begin
                 if(hdr_ready_i) begin
                     if((cb_y == y_limit) && (cb_x == x_limit)) begin
-                        if() begin
-                            /* code */
+                        if((pkt_index == 0) || (sb_cnt == 2)) begin
+                            hdr_last_o          <= 1'b1;
                         end
-                        cb_x                     <= X_W{1'b0};
-                        cb_y                     <= Y_W{1'b0}; 
+                        else begin
+                            sb_cnt              <= sb_cnt + 1'b1;
+                        end
+                        cb_x                    <= X_W{1'b0};
+                        cb_y                    <= Y_W{1'b0}; 
                     end
                     hdr_data_o                  <= s_axis_lenght_rx_data_i;
                     valid_o                     <= 1'b1;

@@ -94,6 +94,8 @@ module hdr_make
     localparam          CB_I_W                  = 6;
     localparam          TMP_W                   = 4;
     localparam          BITS_W                  = 6;
+    localparam          PKT_CNT_W               = 2;
+    localparam          SB_CNT_W                = 2;
 //---------------------------------------------------------------------------------------------------------------------
 // Internal wires and registers
 //---------------------------------------------------------------------------------------------------------------------
@@ -105,21 +107,23 @@ module hdr_make
     reg                 [ZERO_DATA_W-1:0]           zero_reg_3;            [3:0][3:0];
     reg                 [ZERO_DATA_W-1:0]           zero_reg_4;            [7:0][70];
 
-    reg                 [Y_W-1:0]                   y;
-    reg                 [X_W-1:0]                   x;
+    reg                 [Y_W-1:0]                   cb_y,y;
+    reg                 [X_W-1:0]                   cb_x,x;
 
     reg                 [CB_I_W-1:0]                cb_i;
 
-    wire                [Y_W-1:0]                   row_cnt;
-    wire                [Y_W-1:0]                   colum_cnt;
+    wire                [Y_W-1:0]                   y_limit;
+    wire                [Y_W-1:0]                   x_limit;
 
-    reg                 [BITS_W:0]             lblock;
+    reg                 [BITS_W:0]                  lblock;
+    reg                 [PKT_CNT_W-1:0]             pkt_cnt;
+    reg                 [SB_CNT_W-1:0]              sb_cnt;
                                               
 //---------------------------------------------------------------------------------------------------------------------
 // Implementation
 //---------------------------------------------------------------------------------------------------------------------
-assign row_cnt      = 3;
-assign colum_cnt    = 3;
+assign y_limit      = 7;
+assign x_limit      = 7;
 
 always @(posedge clk or negedge rst_n) begin
     if(~rst_n) begin
@@ -140,13 +144,13 @@ always @(posedge clk or negedge rst_n) begin
                     s_axis_zero_rx_reday_o      <= 1'b0;       
                 end
                 else 
-                    if((y == row_cnt) &&  (x == colum_cnt)) begin
+                    if((y == y_limit) &&  (x == x_limit)) begin
                         state_fill              <= STATE_FILL_END;
 
                         y                       <= {Y_W}1'b0;
                         x                       <= {X_W}1'b0;
                     end
-                    else if(x == colum_cnt) begin
+                    else if(x == x_limit) begin
                         y                       <= y + 1'b1;
                         x                       <= {X_W}1'b0;
                     end
@@ -290,7 +294,7 @@ always @(posedge clk or negedge rst_n) begin
                     bit_cnt_o                   <= 6'd32;     
                 end
 
-                cb_i                            <= CB_I_W{1'b0};
+                pkt_cnt                         <= PKT_CNT_W
             end
             STATE_HDR_PKT_INDEX : begin
                 if(hdr_ready_i) begin
@@ -306,7 +310,7 @@ always @(posedge clk or negedge rst_n) begin
                     if(s_axis_pass_rx_data_i == 0) begin
                         state_hdr               <= STATE_HDR_LAST;
 
-                        hdr_data_o              <= {8'h00,1'b1,15'd0,16'hff92};
+                        hdr_data_o              <= HDR_DATA_W{1'b0};
                         valid_o                 <= 1'b1;
                         bit_cnt_o               <= 6'd16;
                         hdr_last_o              <= 1'b1;
@@ -325,7 +329,7 @@ always @(posedge clk or negedge rst_n) begin
             end
             STATE_HDR_CODE_BLOCK : begin
                 if(hdr_ready_i) begin
-                    if(cb_i == 0) begin
+                    if((cb_y == 0 )&& (cb_x == 0)) begin
                         state_hdr               <= STATE_HDR_ZERO_1;
 
                         hdr_data_o              <= {28'd0,4'b1111};
@@ -333,14 +337,14 @@ always @(posedge clk or negedge rst_n) begin
                         bit_cnt_o               <= 6'd4;
                     end
                     else begin
-                        if((y>>2)==0 && (x>>2)== 0) begin
+                        if((cb_y>>2)==0 && (cb_x>>2)== 0) begin
                             state_hdr           <= STATE_HDR_ZERO_2;
 
                             hdr_data_o          <= {29'd0,3'b111};
                             valid_o             <= 1'b1;
                             bit_cnt_o           <= 6'd3;
                         end
-                        else if((y>>1) == 0 && (x>>1) == 0) begin
+                        else if((cb_y>>1) == 0 && (cb_x>>1) == 0) begin
                             state_hdr           <= STATE_HDR_ZERO_3;
 
                             hdr_data_o          <= {30'd0,2'b11};
@@ -457,7 +461,7 @@ always @(posedge clk or negedge rst_n) begin
                         lblock                  <= 6'd3;      
                     end
                     else begin
-                        hdr_data_o              <= {(HDR_DATA_W- BITS_W){},(bits - bits_pass)};
+                        hdr_data_o              <= {(HDR_DATA_W- BITS_W){1'b0},(bits - bits_pass)};
                         valid_o                 <= 1'b1;
                         bit_cnt_o               <= 6'd1;
                         insert_ones_o           <= 1'b1;
@@ -468,7 +472,18 @@ always @(posedge clk or negedge rst_n) begin
             end
             STATE_HDR_LENGTH : begin
                 if(hdr_ready_i) begin
-                    state_hdr                   <= 
+                    if((cb_y == y_limit) && (cb_x == x_limit)) begin
+                        if() begin
+                            /* code */
+                        end
+                        cb_x                     <= X_W{1'b0};
+                        cb_y                     <= Y_W{1'b0}; 
+                    end
+                    hdr_data_o                  <= s_axis_lenght_rx_data_i;
+                    valid_o                     <= 1'b1;
+                    bit_cnt_o                   <= lblock + bits;
+                    insert_ones_o               <= 1'b0;
+
                 end
             end
             default : ;

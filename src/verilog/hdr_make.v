@@ -491,6 +491,7 @@ always @(posedge clk or negedge rst_n) begin
                 if(hdr_ready_i) begin
                     if((cb_y == y_limit) && (cb_x == x_limit)) begin
                         if((pkt_index == 0) || (sb_cnt == 2)) begin
+                            state_hdr           <= STATE_HDR_LAST;
                             hdr_last_o          <= 1'b1;
                         end
                         else begin
@@ -503,7 +504,6 @@ always @(posedge clk or negedge rst_n) begin
                     valid_o                     <= 1'b1;
                     bit_cnt_o                   <= lblock + bits;
                     insert_ones_o               <= 1'b0;
-
                 end
             end
             default : ;

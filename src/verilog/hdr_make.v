@@ -345,7 +345,7 @@ always @(posedge clk or negedge rst_n) begin
                 end
             end
             STATE_HDR_CODE_BLOCK : begin
-                if(hdr_ready_i) begin
+                if(hdr_ready_i || (!valid_o)) begin
                     if((cb_y == 0 )&& (cb_x == 0)) begin
                         state_hdr               <= STATE_HDR_ZERO_1;
 
@@ -354,7 +354,7 @@ always @(posedge clk or negedge rst_n) begin
                         bit_cnt_o               <= 6'd4;
                     end
                     else begin
-                        if((cb_y>>2)==0 && (cb_x>>2)== 0) begin
+                        if((cb_y>>2)==0 && (cb_x>>2) == 0) begin
                             state_hdr           <= STATE_HDR_ZERO_2;
 
                             hdr_data_o          <= {29'd0,3'b111};
@@ -495,15 +495,53 @@ always @(posedge clk or negedge rst_n) begin
                             hdr_last_o          <= 1'b1;
                         end
                         else begin
+                            state_hdr           <= STATE_HDR_SB_WAIT;
                             sb_cnt              <= sb_cnt + 1'b1;
                         end
                         cb_x                    <= X_W{1'b0};
                         cb_y                    <= Y_W{1'b0}; 
+                        hdr_maker_busy          <= 1'b0;
+                    end
+                    else begin
+                        state_hdr               <= STATE_HDR_CODE_BLOCK;
+                        if(cb_x == x_limit) begin
+                            cb_y                <= cb_y + 1'b1;
+                            cb_x                <= X_W{1'b0};    
+                        end
+                        else begin
+                            cb_x                <= cb_x + 1'b1;
+                        end
                     end
                     hdr_data_o                  <= s_axis_lenght_rx_data_i;
                     valid_o                     <= 1'b1;
                     bit_cnt_o                   <= lblock + bits;
                     insert_ones_o               <= 1'b0;
+                end
+            end
+            STATE_HDR_LAST : begin
+                if(hdr_ready_i) begin
+                    if(sb_cnt == 2) begin
+                        state_hdr               <= STATE_HDR_INIT_TILE;
+
+                        pkt_index               <= PKT_INDEX_W{1'b0};    
+                    end
+                    else begin
+                        state_hdr               <= STATE_HDR_INIT_PKT;
+
+                        pkt_index               <= pkt_index +1'b1;
+                    end
+                    sb_cnt                      <= SB_CNT_W{1'b0};
+                    valid_o                     <= 1'b0;
+                    hdr_last_o                  <= 1'b0;
+                end
+            end
+            STATE_HDR_SB_WAIT : begin
+                if(filed_flag_0 && (!valid_o)) begin
+                    state_hdr                   <= STATE_HDR_CODE_BLOCK;
+                    hdr_maker_busy              <= 1'b1;    
+                end
+                else if(hdr_ready_i && valid_o) begin
+                    valid_o                     <= 1'b0;
                 end
             end
             default : ;

@@ -91,7 +91,6 @@ module hdr_make
 
     localparam          Y_W                     = 4;
     localparam          X_W                     = 4;
-    localparam          CB_I_W                  = 6;
     localparam          TMP_W                   = 4;
     localparam          BITS_W                  = 6;
     localparam          PKT_INDEX_W             = 2;
@@ -110,14 +109,16 @@ module hdr_make
     reg                 [Y_W-1:0]                   cb_y,y;
     reg                 [X_W-1:0]                   cb_x,x;
 
-    reg                 [CB_I_W-1:0]                cb_i;
-
     wire                [Y_W-1:0]                   y_limit;
     wire                [Y_W-1:0]                   x_limit;
 
-    reg                 [BITS_W:0]                  lblock;
+    reg                 [BITS_W-1:0]                lblock;
+    reg                 [BITS_W-1:0]                bits;
+    reg                 [BITS_W-1:0]                bits_pass;
     reg                 [PKT_INDEX_W-1:0]           pkt_index;
     reg                 [SB_CNT_W-1:0]              sb_cnt;
+
+    reg                                             hdr_maker_busy;
                                               
 //---------------------------------------------------------------------------------------------------------------------
 // Implementation
@@ -264,18 +265,12 @@ always @(posedge clk or negedge rst_n) begin
             filed_flag_1                        <= 1'b1;
             filed_flag_2                        <= 1'b0;
         end
-        if(filed_flag_1) begin
+        else if(filed_flag_1 && (!hdr_maker_busy)) begin
             filed_flag_0                        <= 1'b1;
             filed_flag_1                        <= 1'b0;
         end
-        if(filed_flag_0) begin
+        else if(filed_flag_0 && hdr_maker_busy) begin
             filed_flag_0                        <= 1'b0;
-        end
-        else begin
-            filed_flag_0                        <= 1'b0;
-            filed_flag_1                        <= 1'b0;
-            filed_flag_2                        <= 1'b0;
-            filed_flag_3                        <= 1'b0;    
         end
     end
 end
@@ -514,7 +509,7 @@ always @(posedge clk or negedge rst_n) begin
                     end
                     hdr_data_o                  <= s_axis_lenght_rx_data_i;
                     valid_o                     <= 1'b1;
-                    bit_cnt_o                   <= lblock + bits;
+                    bit_cnt_o                   <= {26{1'b0},(lblock + bits)};
                     insert_ones_o               <= 1'b0;
                 end
             end
@@ -544,7 +539,27 @@ always @(posedge clk or negedge rst_n) begin
                     valid_o                     <= 1'b0;
                 end
             end
-            default : ;
+            default begin
+                state_hdr                       <= STATE_HDR_INIT_TILE;
+
+                lblock                          <= 0;
+                bits                            <= 0;
+                bits_pass                       <= 0;
+                pkt_index                       <= 0;
+                sb_cnt                          <= 0;
+                cb_x                            <= 0;
+                cb_y                            <= 0;
+
+                valid_o                         <= 0;
+                hdr_last_o                      <= 0;
+                insert_ones_o                   <= 0;
+                insert_zero_o                   <= 0;
+                hdr_maker_busy                  <= 0;
+
+                s_axis_zero_rx_reday_o          <= 0;
+                s_axis_lenght_rx_reday_o        <= 0;
+                s_axis_pass_rx_reday_o          <= 0;
+            end
         endcase   
     end
 end

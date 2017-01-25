@@ -87,7 +87,7 @@ module hdr_make
 //---------------------------------------------------------------------------------------------------------------------
 // localparam definitions
 //---------------------------------------------------------------------------------------------------------------------
-    localparam          NO_OF_FILL_STATES       = 4;
+    localparam          NO_OF_FILL_STATES       = 3;
     localparam          NO_OF_HDR_STATES        = 15;
 
     localparam          Y_W                     = 4;
@@ -100,7 +100,6 @@ module hdr_make
     localparam          STATE_FILL_INIT         = 0;
     localparam          STATE_FILL_ROW          = 1;
     localparam          STATE_FILL_IDLE         = 2;
-    localparam          STATE_FILL_END          = 3;
 
     localparam          STATE_HDR_INIT_TILE     = 0;
     localparam          STATE_HDR_INIT_PKT      = 1;
@@ -109,7 +108,7 @@ module hdr_make
     localparam          STATE_HDR_ZERO_1
     localparam          STATE_HDR_ZERO_2
     localparam          STATE_HDR_ZERO_3
-    localparam          STATE_HDR_ZERO_
+    localparam          STATE_HDR_ZERO_1
     localparam
 //---------------------------------------------------------------------------------------------------------------------
 // Internal wires and registers
@@ -156,41 +155,42 @@ always @(posedge clk or negedge rst_n) begin
             end
             STATE_FILL_ROW  :   begin
                 if(!s_axis_zero_rx_valid_i) begin
-                    state_fill                  <= STATE_FILL_IDLE;
+                    state_fill                  <= STATE_FILL_INIT;
 
                     s_axis_zero_rx_reday_o      <= 1'b0;       
                 end
-                else 
-                    if((y == y_limit) &&  (x == x_limit)) begin
-                        state_fill              <= STATE_FILL_END;
+                else
+                    if(s_axis_zero_rx_reday_o) begin
+                        if((y == y_limit) &&  (x == x_limit)) begin
+                            state_fill          <= STATE_FILL_END;
 
-                        y                       <= {Y_W}1'b0;
-                        x                       <= {X_W}1'b0;
-                    end
-                    else if(x == x_limit) begin
-                        y                       <= y + 1'b1;
-                        x                       <= {X_W}1'b0;
-                    end
-                    else
-                        x                       <= x + 1'b1;
-                    end
-                    zero_reg_4[y][x]            <= s_axis_zero_rx_data_i;
+                            y                   <= {Y_W}1'b0;
+                            x                   <= {X_W}1'b0;
 
-                    s_axis_zero_rx_reday_o      <= 1'b1;
+                        s_axis_zero_rx_reday_o <= 1'b0;
+                        end
+                        else if(x == x_limit) begin
+                            y                   <= y + 1'b1;
+                            x                   <= {X_W}1'b0;
+                        s_axis_zero_rx_reday_o  <= 1'b1;
+                        end
+                        else
+                            x                   <= x + 1'b1;
+                        s_axis_zero_rx_reday_o  <= 1'b1;
+                        end
+                        zero_reg_4[y][x]        <= s_axis_zero_rx_data_i;
+                    end 
+                    else begin
+                        s_axis_zero_rx_reday_o  <= 1'b1;
+                    end
                 end
             end
             STATE_FILL_IDLE :   begin
                 if(s_axis_zero_rx_valid_i) begin
                     state_fill                  <= STATE_FILL_ROW;
-                end
-            end
-            STATE_FILL_END  :   begin
-                if(!hdr_maker_busy) begin
-                    state_fill                  <= STATE_FILL_INIT;
 
-                    filed_flag                  <= 1'b1;
+                    s_axis_zero_rx_reday_o      <= 1'b1;
                 end
-                s_axis_zero_rx_reday_o          <= 1'b0;
             end
         endcase    
     end

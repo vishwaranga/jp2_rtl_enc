@@ -23,7 +23,7 @@
 //
 //  Date        Developer       Description
 //  ----        ---------       -----------
-//  25/01/2017  sajith 			bit assembler
+//  25/01/2017  sajith          bit assembler
 //
 // ********************************************************************************************************************
 
@@ -53,12 +53,12 @@ module _
     output reg              [KEEP_W-1:0]        m_axis_hdr_tx_keep_o,
     input                                       m_axis_hdr_tx_ready_i,
 
-    input 	                                    valid_o,
-    input 	                                    hdr_last_o,
-    input 	                                    insert_zero_o,
-    input 	                                    insert_ones_o,
-    input 	                [BIT_CNT_W-1:0]     bit_cnt_o,
-    input 	                [HDR_DATA_W-1:0]    hdr_data_o,
+    input                                       valid_o,
+    input                                       hdr_last_o,
+    input                                       insert_zero_o,
+    input                                       insert_ones_o,
+    input                   [BIT_CNT_W-1:0]     bit_cnt_o,
+    input                   [HDR_DATA_W-1:0]    hdr_data_o,
     output reg                                  hdr_ready_i
 );
 
@@ -69,31 +69,31 @@ module _
 //---------------------------------------------------------------------------------------------------------------------
 // localparam definitions
 //---------------------------------------------------------------------------------------------------------------------
-	localparam 				NO_OF_STATES		= 10;	
-	localparam 				TMP_W 				= 8;
-	localparam 				REM_CNT_W 			= BIT_CNT_W;	
+    localparam              NO_OF_STATES        = 10;   
+    localparam              TMP_W               = 8;
+    localparam              REM_CNT_W           = BIT_CNT_W;    
 //---------------------------------------------------------------------------------------------------------------------
 // Internal wires and registers
 //---------------------------------------------------------------------------------------------------------------------
-	reg 				[NO_OF_STATES-1:0] 		state;
-	reg 				[TMP_W-1:0] 			tmp_b; 
-	reg 				[REM_CNT_W-1:0]			remain_bits;					
+    reg                 [NO_OF_STATES-1:0]      state;
+    reg                 [TMP_W-1:0]             tmp_b; 
+    reg                 [REM_CNT_W-1:0]         remain_bits;                    
 //---------------------------------------------------------------------------------------------------------------------
 // Implementation
 //---------------------------------------------------------------------------------------------------------------------
 always @(posedge clk or negedge rst_n) begin
-	if(~rst_n) begin
-		 <= 0;
-	end 
-	else begin
-		case (state) begin
-			STATE_INIT : begin
-				if(valid_o) begin
-					
-				end
-			end
-			default : /* default */;
-		endcase	 
-	end
+    if(~rst_n) begin
+         <= 0;
+    end 
+    else begin
+        case (state) begin
+            STATE_INIT : begin
+                if(valid_o) begin
+                    state                       <= STATE_BIT_FILL;  
+                end
+            end
+            default : /* default */;
+        endcase  
+    end
 end
 endmodule

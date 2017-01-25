@@ -77,7 +77,8 @@ module hdr_make
     output reg                                  insert_ones_o,
     output reg              [BIT_CNT_W-1:0]     bit_cnt_o,
     output reg              [HDR_DATA_W-1:0]    hdr_data_o,
-);  input                                       hdr_ready_i,
+    input                                       hdr_ready_i
+);
 
 //---------------------------------------------------------------------------------------------------------------------
 // Global constant headers
@@ -87,7 +88,7 @@ module hdr_make
 // localparam definitions
 //---------------------------------------------------------------------------------------------------------------------
     localparam          NO_OF_FILL_STATES       = 4;
-    localparam          NO_OF_HDR_STATES        = 4;
+    localparam          NO_OF_HDR_STATES        = 15;
 
     localparam          Y_W                     = 4;
     localparam          X_W                     = 4;
@@ -95,6 +96,21 @@ module hdr_make
     localparam          BITS_W                  = 6;
     localparam          PKT_INDEX_W             = 2;
     localparam          SB_CNT_W                = 2;
+
+    localparam          STATE_FILL_INIT         = 0;
+    localparam          STATE_FILL_ROW          = 1;
+    localparam          STATE_FILL_IDLE         = 2;
+    localparam          STATE_FILL_END          = 3;
+
+    localparam          STATE_HDR_INIT_TILE     = 0;
+    localparam          STATE_HDR_INIT_PKT      = 1;
+    localparam          STATE_HDR_PKT_INDEX
+    localparam          STATE_HDR_CHECK_ZERO
+    localparam          STATE_HDR_ZERO_1
+    localparam          STATE_HDR_ZERO_2
+    localparam          STATE_HDR_ZERO_3
+    localparam          STATE_HDR_ZERO_
+    localparam
 //---------------------------------------------------------------------------------------------------------------------
 // Internal wires and registers
 //---------------------------------------------------------------------------------------------------------------------

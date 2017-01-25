@@ -29,7 +29,7 @@
 
 `timescale 1ns / 1ps
 
-module bit_assembler
+module file_maker
 #(
 //---------------------------------------------------------------------------------------------------------------------
 // parameter definitions

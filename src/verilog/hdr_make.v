@@ -37,7 +37,7 @@ module hdr_make
     parameter               DATA_W          =   128,
     parameter               KEEP_W          =   DATA_W/8,
 
-    parameter               ZERO_DATA_W     =   5,
+    parameter               ZERO_DATA_W     =   6,
     parameter               PASS_DATA_W     =   9,
     parameter               LENGTH_DATA_W   =   32,
     parameter               BIT_CNT_W       =   6,
@@ -396,6 +396,7 @@ always @(posedge clk or negedge rst_n) begin
                     hdr_data_o                  <= {(32-ZERO_DATA_W){1'b0},zero_reg_1};
                     valid_o                     <= 1'b1;
                     insert_zero_o               <= 1'b1;
+                    bit_cnt_o                   <= zero_reg_1;
                 end
             end
             STATE_HDR_ZERO_2 : begin
@@ -405,6 +406,7 @@ always @(posedge clk or negedge rst_n) begin
                     hdr_data_o                  <= {(32-ZERO_DATA_W){1'b0},zero_reg_2[y>>2][x>>2]};
                     valid_o                     <= 1'b1;
                     insert_zero_o               <= 1'b1;
+                    bit_cnt_o                   <= zero_reg_2[y>>2][x>>2];
                 end
             end
             STATE_HDR_ZERO_3 : begin
@@ -414,6 +416,7 @@ always @(posedge clk or negedge rst_n) begin
                     hdr_data_o                  <= {(32-ZERO_DATA_W){1'b0},zero_reg_3[y>>1][x>>1]};
                     valid_o                     <= 1'b1;
                     insert_zero_o               <= 1'b1;
+                    bit_cnt_o                   <= zero_reg_2[y>>1][x>>1];
                 end
             end
             STATE_HDR_ZERO_4 : begin
@@ -423,6 +426,7 @@ always @(posedge clk or negedge rst_n) begin
                     hdr_data_o                  <= {(32-ZERO_DATA_W){1'b0},zero_reg_4[y][x]};
                     valid_o                     <= 1'b1;
                     insert_zero_o               <= 1'b1;
+                    bit_cnt_o                   <= zero_reg_2[y][x];
                 end
             end
             STATE_HDR_PASS : begin
